@@ -1,0 +1,855 @@
+---
+title: "GLOBALNY RYNEK PRACY FREELANCERÓW"
+author: "Wykonawca: Maja Pietrzyk"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    df_print: paged
+---
+
+<style>
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin:12px 0 18px;
+}
+
+.kpi{
+  background:#fff;
+  border:1px solid rgba(0,0,0,.10);
+  border-radius:14px;
+  padding:16px 14px;
+  text-align:center;              /* centrowanie tekstu */
+  display:flex;                   /* centrowanie w pionie */
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height: 92px;               /* żeby kafelki miały podobną wysokość */
+}
+
+.kpi .label{
+  font-size:13px;
+  font-weight:600;
+  color:#2c3e50;
+  margin-bottom:8px;
+}
+
+.kpi .value{
+  font-size:30px;
+  font-weight:800;
+  color:#2c3e50;
+  line-height:1;
+}
+
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.kpi-grid{grid-template-columns:1fr;}}
+</style>
+
+<style>
+.section-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 18px;
+  padding: 24px 26px;
+  margin: 28px 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,.04);
+}
+
+.section-card h3 {
+  margin-top: 0;
+  font-weight: 700;
+}
+
+.section-lead {
+  font-size: 15px;
+  color: #5a6c7d;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+</style>
+
+<style>
+/* centrowanie wykresów w R Markdown */
+.plot, .r-plot, .html-widget, .leaflet, .dygraphs {
+  display: block;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* obrazy też (czasem wykres jest img) */
+img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+<style>
+/* Więcej przestrzeni wokół całego bloku interpretacji */
+details {
+  margin: 14px 0 18px;
+  padding: 10px 14px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* Odstęp pod samym nagłówkiem "Interpretacja wykresu" */
+details > summary {
+  cursor: pointer;
+  padding: 8px 4px;
+  margin-bottom: 10px;   /* kluczowe: przestrzeń między summary a treścią */
+  font-weight: 700;
+}
+
+/* Lepsza czytelność tekstu w środku */
+details p {
+  margin: 0 0 12px;      /* odstęp między akapitami */
+  line-height: 1.65;     /* "oddech" wierszy */
+}
+
+/* Jeśli w środku masz tekst bez <p>, tylko gołe linie — to też pomoże */
+details {
+  line-height: 1.65;
+}
+</style>
+
+
+# Wprowadzenie i opis problemu
+
+  Praca freelancerska stała się istotnym elementem globalnego rynku pracy, szczególnie w branżach technologicznych. Rozwój platform cyfrowych umożliwia współpracę z klientami na całym świecie, co rodzi pytania o różnice w zarobkach pomiędzy regionami, poziomami doświadczenia oraz modelami pracy.
+
+
+**Cel projektu**
+
+  Celem projektu jest przeprowadzenie pełnej analizy danych dotyczących zarobków freelancerów oraz identyfikacja czynników, które najsilniej wpływają na poziom wynagrodzeń (godzinowych i rocznych).
+
+
+**Pytania badawcze**
+
+- Jak różnią się zarobki freelancerów pomiędzy regionami świata?
+
+- Jak poziom doświadczenia wpływa na rozkład dochodów?
+
+- Które umiejętności są najwyżej wyceniane?
+
+- Czy platforma pracy wiąże się z większym zasięgiem geograficznym i liczbą freelancerów?
+
+- Czy doświadczenie wzmacnia różnice regionalne w dochodach rocznych?
+
+
+# Opis danych i przygotowanie
+
+
+## Źródło danych
+
+  W projekcie wykorzystano publicznie dostępny zbiór danych pochodzący z platformy [Kaggle](https://www.kaggle.com/datasets/shaistashahid/freelancer-income-vs-skills/data), opisujący freelancerów działających na globalnym rynku pracy. Zbiór zawiera informacje m.in. o regionie geograficznym, poziomie doświadczenia, platformie pracy, posiadanych kompetencjach oraz zarobkach freelancerów (stawki godzinowe i dochody roczne).
+
+
+## Wczytanie danych
+
+```{r load_data, echo=FALSE, warning=FALSE}
+data <- read.csv("freelancer_earnings - freelancer_earnings_vs_skillstack_dataset.csv")
+str(data)
+
+```
+## Przygotowanie i czyszczenie danych
+
+W ramach przygotowania danych:
+
+- uporządkowano typy zmiennych liczbowych,
+
+- usunięto symbole walutowe (np. $) z dochodu rocznego.
+
+```{r clean_data_check, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+
+data <- data %>%
+  mutate(
+    annual_income_usd = as.numeric(gsub("[\\$,]", "", annual_income_usd))
+  )
+
+cols <- c("hourly_rate_usd","annual_income_usd","years_experience")
+
+types <- capture.output(sapply(data[cols], class))
+nas   <- capture.output(colSums(is.na(data[cols])))
+summ  <- capture.output(summary(data[cols]))
+
+cat(
+  "Typy danych po czyszczeniu:\n",
+  paste(types, collapse = "\n"),
+  "\n\nLiczba braków (NA) po konwersji:\n",
+  paste(nas, collapse = "\n"),
+  "\n\nPodsumowanie po czyszczeniu:\n",
+  paste(summ, collapse = "\n"),
+  sep = ""
+)
+
+```
+Zestawienie danych:
+
+```{r kpi_cards, echo=FALSE, results='asis', message=FALSE, warning=FALSE}
+df <- read.csv(
+  "freelancer_earnings - freelancer_earnings_vs_skillstack_dataset.csv",
+  stringsAsFactors = FALSE
+)
+
+kpi <- list(
+  "Freelancerzy" = length(unique(df$freelancer_id)),
+  "Regiony"     = length(unique(df$region)),
+  "Kraje"       = length(unique(df$country)),
+  "Platformy"     = length(unique(df$primary_platform)),
+  "Kategorie"    = length(unique(df$category)),
+  "Umiejętności" = length(unique(df$primary_skills))
+)
+
+cat('<div class="kpi-grid">')
+for (nm in names(kpi)) {
+  cat(sprintf(
+    '<div class="kpi"><div class="label">%s</div><div class="value">%s</div></div>',
+    nm, format(kpi[[nm]], big.mark = " ")
+  ))
+}
+cat('</div>')
+
+
+```
+
+# Analiza eksploracyjna danych (EDA)
+
+## Charakterystyka stawek i dochodów freelancerów
+
+  Celem tej analizy jest ocena struktury stawek godzinowych na globalnym rynku freelancerów oraz identyfikacja typowego poziomu wynagrodzeń i występowania wartości skrajnych.
+  
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  Poniższy wykres pozwala określić typowy poziom stawek na rynku freelancerów
+  oraz sprawdza, czy rozkład wynagrodzeń jest symetryczny czy skośny.
+  </p>
+
+```{r,warning=FALSE, echo=FALSE}
+
+library(ggplot2)
+x <- data$hourly_rate_usd
+x <- x[!is.na(x)]
+
+med <- median(x)
+avg <- mean(x)
+
+ggplot(data, aes(x = hourly_rate_usd)) +
+  geom_histogram(binwidth = 10, boundary = 0, fill = "steelblue", color = "white") +
+  geom_vline(xintercept = med, linewidth = 1, linetype = "solid") +
+  geom_vline(xintercept = avg, linewidth = 1, linetype = "dashed") +
+  scale_x_continuous(breaks = seq(0, ceiling(max(x)/10)*10, by = 20)) +
+  labs(
+    title = "Rozkład stawek godzinowych freelancerów",
+    subtitle = paste0("Mediana: ", round(med, 1), " USD (linia ciągła), Średnia: ", round(avg, 1), " USD (linia przerywana)"),
+    x = "Stawka godzinowa (USD)",
+    y = "Liczba freelancerów"
+  ) +
+  theme_minimal(base_size = 12)
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+
+  Wykres przedstawia rozkład stawek godzinowych freelancerów wyrażonych w USD. Rozkład jest **prawostronnie skośny**, co oznacza, że większość obserwacji skupia się przy niższych stawkach, a w danych występuje mniejsza liczba freelancerów osiągających bardzo wysokie wynagrodzenia.
+  
+  Największe zagęszczenie obserwacji występuje w przedziale około **50–90 USD za godzinę**, co wskazuje na dominujący segment rynku. Potwierdza to **mediana wynosząca 84,4 USD**, która dobrze reprezentuje „typową” stawkę godzinową freelancera w badanej próbie.
+  
+  Średnia stawka godzinowa (**97,1 USD**) jest wyraźnie wyższa od mediany, co świadczy o wpływie **wysokich stawek skrajnych** (outlierów) na wartość średnią. Oznacza to, że niewielka grupa bardzo dobrze opłacanych freelancerów zawyża przeciętną stawkę rynkową.
+  
+  Widoczny długi ogon po prawej stronie rozkładu, sięgający powyżej **250 USD za godzinę**, wskazuje na istnienie wąskiej grupy wysoko wyspecjalizowanych ekspertów, których stawki znacząco odbiegają od większości rynku.
+
+  </details>
+
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Celem tego zestawienia jest porównanie potencjału dochodowego freelancerów pomiędzy regionami świata. Wykres prezentuje średni roczny dochód (USD) w każdej grupie, a etykiety wskazują także liczebność obserwacji (n), co pozwala ocenić wiarygodność porównań.
+  
+  </p>
+  
+```{r, echo=FALSE, warning=FALSE}
+
+region_income <- data %>%
+  filter(!is.na(region), !is.na(annual_income_usd)) %>%
+  group_by(region) %>%
+  summarise(
+    mean_income = mean(annual_income_usd, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+library(ggplot2)
+ggplot(region_income, aes(x = reorder(region, -mean_income), y = mean_income)) +
+  geom_col(fill = "#3182BD") +
+  geom_text(
+    aes(label = paste0(round(mean_income / 1000, 1), "k USD\n(n = ", n, ")")),
+    vjust = -0.3,
+    size = 3.5
+  ) +
+  expand_limits(y = max(region_income$mean_income) * 1.25) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Średni roczny dochód freelancerów według regionu",
+    x = "Region",
+    y = "Średni roczny dochód (USD)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Na podstawie danych można zaobserwować średnie roczne dochody freelancerów w podziale na regiony geograficzne, wraz z liczbą obserwacji w każdej grupie. Widoczne jest **wyraźne zróżnicowanie poziomu dochodów pomiędzy regionami**, co potwierdza istotny wpływ lokalnych rynków pracy na potencjał zarobkowy freelancerów.
+  
+  Najwyższe średnie roczne dochody osiągają freelancerzy w **Europie Zachodniej** (ok. **141,7 tys. USD**, *n = 72*) oraz **Ameryce Północnej** (ok. **135,4 tys. USD**, *n = 63*). Regiony te charakteryzują się rozwiniętymi rynkami technologicznymi, wysoką siłą nabywczą oraz dużym popytem na wyspecjalizowane kompetencje.
+  
+  Kolejną grupę stanowi **Bliski Wschód**, gdzie średni roczny dochód wynosi około **108,1 tys. USD** (*n = 81*). Wynik ten sugeruje dynamiczny rozwój rynku usług specjalistycznych w tym regionie, choć poziom dochodów pozostaje niższy niż w Europie Zachodniej i Ameryce Północnej.
+  
+  Znacznie niższe średnie dochody obserwowane są w regionach **Azji i Pacyfiku** (**79,3 tys. USD**, *n = 59*), **Europie Wschodniej** (**69,6 tys. USD**, *n = 84*) oraz **Ameryce Łacińskiej** (**60,5 tys. USD**, *n = 69*). Najniższe średnie roczne dochody występują w **Afryce** (**48 tys. USD**, *n = 72*), co może wynikać z ograniczeń rynkowych oraz niższych stawek godzinowych.
+
+  </details>
+  
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Wykres przedstawia rozkład rocznych dochodów freelancerów według regionu i poziomu doświadczenia, umożliwiając porównanie median oraz zmienności wynagrodzeń w poszczególnych grupach.
+  
+  </p>
+
+```{r, echo=FALSE, warning=FALSE}
+library(ggplot2)
+ggplot(
+  data %>% filter(!is.na(experience_level), !is.na(region), !is.na(annual_income_usd)),
+  aes(x = region, y = annual_income_usd)
+) +
+  geom_boxplot(fill = "#9ECAE1", outlier.alpha = 0.3) +
+  facet_wrap(~ experience_level) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Rozkład rocznych dochodów freelancerów",
+  subtitle = "Podział według regionu i poziomu doświadczenia",x = "Region",
+    y = "Roczny dochód (USD)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Analiza ukazuje rozkłady rocznych dochodów freelancerów w podziale na regiony geograficzne oraz poziomy doświadczenia (junior, mid, senior), co pozwala jednocześnie analizować wpływ **doświadczenia zawodowego** oraz **kontekstu regionalnego** na poziom zarobków.
+  
+  **Poziom junior**
+  
+  W grupie juniorów roczne dochody są relatywnie niskie we wszystkich regionach, a rozkłady charakteryzują się niewielkim zróżnicowaniem. Najwyższe mediany dochodów występują w **Ameryce Północnej** oraz **Europie Zachodniej**, jednak różnice między regionami są ograniczone. Wskazuje to, że na wczesnym etapie kariery wpływ regionu na zarobki jest słabszy niż na wyższych poziomach doświadczenia.
+  
+  **Poziom mid**
+  
+  Wśród freelancerów na poziomie mid obserwowany jest wyraźny wzrost dochodów we wszystkich regionach, a różnice regionalne stają się bardziej widoczne. Regiony takie jak **Europa Zachodnia**, **Ameryka Północna** oraz **Bliski Wschód** charakteryzują się wyraźnie wyższymi medianami dochodów oraz większym rozrzutem wartości, co sugeruje rosnącą rolę specjalizacji i doświadczenia w kształtowaniu wynagrodzeń.
+  
+  **Poziom senior**
+  
+  Największe zróżnicowanie dochodów występuje w grupie seniorów. W regionach o dojrzałych rynkach pracy – przede wszystkim w **Europie Zachodniej** i **Ameryce Północnej** – obserwowane są najwyższe mediany dochodów oraz długie „górne ogony” rozkładów, sięgające bardzo wysokich wartości. Jednocześnie w regionach takich jak **Afryka** czy **Ameryka Łacińska** dochody seniorów pozostają wyraźnie niższe, mimo większego doświadczenia.
+
+</details>
+
+
+  Analiza stawek godzinowych i rocznych dochodów freelancerów pokazuje, że globalny rynek pracy freelancerskiej jest silnie zróżnicowany i charakteryzuje się prawostronnie skośnymi rozkładami wynagrodzeń. Oznacza to, że większość obserwacji koncentruje się wokół umiarkowanych stawek, natomiast średnie wartości są zawyżane przez niewielką grupę bardzo wysoko opłacanych specjalistów.
+  
+  Jednocześnie widoczne są istotne różnice regionalne, które nasilają się wraz ze wzrostem poziomu doświadczenia zawodowego. Wyniki wskazują, że zarówno kontekst geograficzny, jak i doświadczenie stanowią kluczowe czynniki kształtujące poziom wynagrodzeń freelancerów.
+
+## Doświadczenie zawodowe a wynagrodzenie
+
+  W tej części analizy skupiono się na roli doświadczenia zawodowego jako jednego z kluczowych czynników kształtujących poziom wynagrodzeń freelancerów. Celem jest ocena, w jaki sposób wraz ze wzrostem doświadczenia zmieniają się stawki godzinowe oraz struktura zarobków na globalnym rynku pracy freelancerskiej.
+
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Zestawienie pozwala ocenić zależności pomiędzy poziomem doświadczenia zawodowego a stawką godzinową. Zastosowany wykres umożliwia jednoczesne porównanie centralnych tendencji oraz zmienności wynagrodzeń wśród juniorów, midów i seniorów.
+  
+  </p>
+  
+```{r, echo=FALSE, warning=FALSE}
+library(ggplot2)
+ggplot(data, aes(x = experience_level, y = hourly_rate_usd)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Stawka godzinowa vs. poziom doświadczenia",
+    x = "Poziom doświadczenia",
+    y = "Stawka godzinowa (USD)"
+  ) +
+  theme_minimal()
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Wykres przedstawia zależność pomiędzy stawką godzinową freelancerów a poziomem doświadczenia (junior, mid, senior). Widoczny jest **wyraźny wzrost mediany stawki wraz z poziomem doświadczenia**, co potwierdza, że doświadczenie zawodowe jest istotnym czynnikiem determinującym wynagrodzenie.
+  
+  Freelancerzy na poziomie **junior** osiągają najniższe stawki godzinowe, z relatywnie wąskim rozrzutem wartości, co sugeruje ograniczoną możliwość negocjacji wynagrodzenia na tym etapie kariery. Mediana stawek w tej grupie koncentruje się na wyraźnie niższym poziomie niż w pozostałych grupach.
+  
+  W przypadku poziomu **mid** obserwowany jest zarówno wzrost mediany stawek, jak i **znacznie większa zmienność wynagrodzeń**. Oznacza to, że wraz z doświadczeniem pojawia się większe zróżnicowanie kompetencji, specjalizacji oraz modeli współpracy, co przekłada się na szerszy zakres możliwych stawek.
+  
+  Najwyższe stawki godzinowe osiągają freelancerzy na poziomie **senior**, przy czym rozkład ich wynagrodzeń charakteryzuje się **największym rozrzutem** oraz obecnością wartości skrajnych. Wskazuje to, że w tej grupie znajdują się zarówno specjaliści o „standardowych” stawkach, jak i wąska grupa ekspertów o bardzo wysokich kompetencjach, osiągających wyjątkowo wysokie wynagrodzenia.
+
+  </details>
+  
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Uzupełnieniem analizy stawek godzinowych jest spojrzenie na to, jak deklarowane poziomy doświadczenia przekładają się na faktyczną liczbę lat pracy zawodowej. Wykres prezentuje rozkład obserwacji w każdej grupie oraz medianę lat doświadczenia, co pozwala ocenić spójność i zróżnicowanie definicji poziomów junior, mid i senior.
+  
+  </p>
+
+```{r, echo=FALSE, warning=FALSE}
+library(ggplot2)
+
+y_min <- floor(min(data$years_experience, na.rm = TRUE))
+y_max <- ceiling(max(data$years_experience, na.rm = TRUE))
+
+ggplot(data, aes(x = experience_level, y = years_experience)) +
+  geom_jitter(width = 0.15, alpha = 0.5, size = 1.5) +
+  stat_summary(
+    fun = median,
+    geom = "crossbar",
+    width = 0.5,
+    color = "steelblue",
+    linewidth = 0.5
+  ) +
+  scale_y_continuous(
+    breaks = seq(y_min, y_max, by = 1),
+    minor_breaks = seq(y_min, y_max, by = 0.5)
+  ) +
+  labs(
+    title = "Lata doświadczenia vs. poziom doświadczenia",
+    subtitle = "Punkty: obserwacje, niebieska linia: mediana",
+    x = "Poziom doświadczenia",
+    y = "Lata doświadczenia"
+  ) +
+  theme_minimal(base_size = 12)
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Analiza ukazuje rozkład liczby lat doświadczenia zawodowego w zależności od deklarowanego poziomu doświadczenia (junior, mid, senior). Każdy punkt odpowiada pojedynczemu freelancerowi, natomiast niebieska linia wskazuje **medianę liczby lat doświadczenia** w danej grupie.
+  
+  Dla poziomu **junior** obserwacje skupiają się głównie w przedziale około **1–2 lat doświadczenia**, a mediana wynosi nieco powyżej **1 roku**. Rozrzut wartości jest niewielki, co sugeruje spójną i dość jednoznaczną definicję tego poziomu doświadczenia.
+  
+  W przypadku poziomu **mid** rozkład lat doświadczenia przesuwa się wyraźnie w górę, obejmując głównie zakres **3–5 lat**, z medianą w okolicach **4 lat doświadczenia**. W porównaniu do juniorów widoczny jest większy rozrzut, co może wskazywać na bardziej zróżnicowane ścieżki kariery w tej grupie.
+  
+  Największe zróżnicowanie obserwowane jest w grupie **senior**, gdzie lata doświadczenia mieszczą się w szerokim przedziale od około **5 do ponad 13 lat**, a mediana wynosi około **7–8 lat**. Duży rozrzut wartości wskazuje, że poziom senior obejmuje zarówno osoby z relatywnie niewielkim stażem, jak i bardzo doświadczonych specjalistów.
+
+  </details>
+  
+  Podsumowując, doświadczenie zawodowe ma istotny i jednoznaczny wpływ na poziom wynagrodzeń freelancerów.
+  Wraz ze wzrostem doświadczenia rosną zarówno mediany stawek godzinowych, jak i zróżnicowanie zarobków,
+  co wskazuje na większy potencjał dochodowy, ale także większe rozwarstwienie wynagrodzeń
+  na wyższych etapach kariery.
+  
+## Wynagrodzenie w zależności od specjalizacji i kompetencji
+
+  W niniejszym fragmencie analizy skupiono uwagę na zróżnicowanie wynagrodzeń freelancerów w zależności od rodzaju specjalizacji oraz posiadanych kompetencji. Celem jest identyfikacja obszarów technologicznych i umiejętności, które osiągają najwyższe przeciętne stawki godzinowe na rynku pracy freelancerskiej.
+
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Poniżej porównano średnie stawki godzinowe freelancerów w podziale na kategorie specjalizacji, aby wskazać obszary kompetencyjne o najwyższej i najniższej wycenie rynkowej.
+  
+  </p>
+
+```{r, echo=FALSE, warning=FALSE}
+library(ggplot2)
+
+cat_summary <- data %>%
+  group_by(category) %>%
+  summarise(mean_rate = mean(hourly_rate_usd, na.rm = TRUE), .groups = "drop")
+
+ggplot(cat_summary, aes(x = reorder(category, mean_rate), y = mean_rate)) +
+  geom_col(fill = "steelblue") +
+  geom_text(
+    aes(label = paste0(round(mean_rate, 1), " USD")),
+    hjust = -0.05,
+    size = 3.5
+  ) +
+  coord_flip() +
+  expand_limits(y = max(cat_summary$mean_rate) * 1.15) +
+  labs(
+    title = "Średnia stawka godzinowa według kategorii",
+    x = "Kategoria",
+    y = "Średnia stawka (USD)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Dane wyraźnie wskazują, że widoczne są **istotne różnice w poziomie wynagrodzeń pomiędzy poszczególnymi obszarami kompetencyjnymi**, co wskazuje na zróżnicowaną wartość rynkową poszczególnych specjalizacji.
+  
+  Najwyższe średnie stawki osiągają specjaliści z obszaru **AI/ML Engineering** (ok. **124 USD/h**), co potwierdza wysokie zapotrzebowanie na zaawansowane kompetencje związane z analizą danych i sztuczną inteligencją. Kolejne miejsca zajmują **Blockchain** (**118,6 USD/h**) oraz **Cybersecurity** (**113,3 USD/h**), czyli dziedziny wymagające wysokiej specjalizacji i odpowiedzialności.
+  
+  Średni segment rynku reprezentują kategorie takie jak **Data Engineering** (**101,3 USD/h**), **Full Stack** (**96,5 USD/h**) oraz **DevOps** (**89,9 USD/h**). Są to role techniczne o szerokim zakresie kompetencji, jednak o większej dostępności specjalistów niż w przypadku najbardziej niszowych technologii.
+  
+  Najniższe średnie stawki obserwowane są w kategoriach **Web Development** (**76,5 USD/h**) oraz **UI/UX Design** (**77,7 USD/h**). Może to wynikać z większej podaży specjalistów w tych obszarach oraz niższego progu wejścia w porównaniu do bardziej zaawansowanych dziedzin inżynieryjnych.
+
+  </details>
+  
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Poniższa wizualizacja przedstawia pięć najwyżej wycenianych umiejętności na rynku freelancerskim, uszeregowanych według średniej stawki godzinowej wraz z liczbą obserwacji.
+  
+  </p>
+  
+```{r, echo=FALSE, warning=FALSE}
+##### Analiza wartości każdego skilla
+skills_raw <- as.character(data$primary_skills)
+rates <- data$hourly_rate_usd
+
+skills_list <- strsplit(skills_raw, ",")
+
+skill_long <- data.frame(
+  skill = trimws(unlist(skills_list)),
+  hourly_rate_usd = rep(rates, lengths(skills_list))
+)
+
+skill_long <- subset(skill_long, !is.na(skill) & skill != "" & !is.na(hourly_rate_usd))
+
+agg <- aggregate(
+  hourly_rate_usd ~ skill,
+  data = skill_long,
+  FUN = function(x) c(mean_rate = mean(x), n = length(x))
+)
+
+agg$mean_rate <- agg$hourly_rate_usd[, "mean_rate"]
+agg$count <- agg$hourly_rate_usd[, "n"]
+agg$hourly_rate_usd <- NULL
+
+top5_paid <- agg[order(-agg$mean_rate), ][1:5, ]
+
+# Wykres Top 5 najwyżej wycenianych umiejętności
+top5_paid$skill <- factor(
+  top5_paid$skill,
+  levels = top5_paid$skill[order(top5_paid$mean_rate)]
+)
+
+library(ggplot2)
+
+ggplot(top5_paid, aes(x = skill, y = mean_rate)) +
+  geom_col(fill = "steelblue") +
+  geom_text(
+    aes(label = paste0(round(mean_rate, 1), " USD (n=", count, ")")),
+    hjust = -0.05,
+    size = 3.5
+  ) +
+  coord_flip(clip = "off") +
+  expand_limits(y = max(top5_paid$mean_rate) * 1.30) +
+  labs(
+    title = "Top 5 najwyżej wycenianych umiejętności",
+    subtitle = "Ranking wg średniej stawki godzinowej",
+    x = "Umiejętność",
+    y = "Średnia stawka (USD)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.margin = margin(5.5, 40, 5.5, 5.5))
+
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Wszystkie umiejętności wchodzące w skład zestawienia należą do obszaru **zaawansowanej analizy danych, sztucznej inteligencji oraz technologii blockchain**, co podkreśla wysoką wartość rynkową tych kompetencji.
+  
+  Najwyżej wycenianą umiejętnością jest **PyTorch**, ze średnią stawką około **141 USD za godzinę** przy **18 obserwacjach**, co wskazuje na duże zapotrzebowanie na specjalistów pracujących z nowoczesnymi frameworkami uczenia maszynowego. Kolejne miejsca zajmują **Computer Vision** (**135,8 USD/h**, *n = 27*) oraz **DeFi** (**133,9 USD/h**, *n = 21*), czyli obszary wymagające zaawansowanej wiedzy technicznej i specjalistycznych kompetencji.
+  
+  W dalszej kolejności znajdują się **NLP** (**124,5 USD/h**, *n = 23*) oraz **Data Science** (**121,9 USD/h**, *n = 25*). Mimo nieco niższych średnich stawek, nadal są to umiejętności wyraźnie powyżej średniej rynkowej, a ich relatywnie wysoka liczba obserwacji zwiększa wiarygodność uzyskanych wyników.
+
+  </details>
+  
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Kolejny pokazuje strukturę poziomów doświadczenia wśród freelancerów posiadających pięć najwyżej wycenianych umiejętności, umożliwiając ocenę, które kompetencje są realizowane głównie przez bardziej doświadczonych specjalistów.
+  
+  </p>
+
+```{r, echo=FALSE, warning=FALSE}
+# Analiza
+
+skills_raw <- as.character(data$primary_skills)
+rates <- data$hourly_rate_usd
+exp_levels <- data$experience_level
+
+skills_list <- strsplit(skills_raw, ",")
+
+skill_long <- data.frame(
+  skill = trimws(unlist(skills_list)),
+  hourly_rate_usd = rep(rates, lengths(skills_list)),
+  experience_level = rep(exp_levels, lengths(skills_list))
+)
+skill_long <- subset(
+  skill_long,
+  !is.na(skill) & skill != "" &
+    !is.na(hourly_rate_usd) &
+    !is.na(experience_level)
+)
+
+agg <- aggregate(
+  hourly_rate_usd ~ skill,
+  data = skill_long,
+  FUN = function(x) c(
+    mean_rate = mean(x),
+    n = length(x)
+  )
+)
+agg$mean_rate <- agg$hourly_rate_usd[, "mean_rate"]
+agg$count <- agg$hourly_rate_usd[, "n"]
+agg$hourly_rate_usd <- NULL
+
+
+top5_paid <- agg[order(-agg$mean_rate), ][1:5, ]
+
+top_skills <- top5_paid$skill
+
+# Wykres
+
+library(ggplot2)
+
+skill_exp_top5 <- subset(skill_long, skill %in% top_skills)
+
+skill_exp_table <- with(skill_exp_top5, table(skill, experience_level))
+
+skill_exp_df <- as.data.frame(skill_exp_table)
+colnames(skill_exp_df) <- c("skill", "experience_level", "count")
+
+skill_exp_df$skill <- factor(skill_exp_df$skill, levels = rev(top5_paid$skill))
+
+ggplot(skill_exp_df, aes(x = skill, y = count, fill = experience_level)) +
+  geom_col(position = "fill") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(
+    values = c(
+      "junior" = "#EFF3FF",
+      "mid"    = "#6BAED6",
+      "senior" = "#08306B"
+    )
+  ) +
+  labs(
+    title = "Doświadczenie w TOP 5 najlepiej opłacanych umiejętności",
+    x = "Umiejętność",
+    y = "Udział procentowy",
+    fill = "Poziom doświadczenia"
+  ) +
+  theme_minimal(base_size = 12)
+
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Umiejętności – **PyTorch, Computer Vision, DeFi, NLP oraz Data Science** – zostały wcześniej wskazane jako osiągające najwyższe średnie stawki godzinowe na rynku.
+  
+  We wszystkich analizowanych kompetencjach **dominują freelancerzy na poziomie mid oraz senior**, co bezpośrednio tłumaczy wysokie średnie stawki godzinowe obserwowane w poprzednim wykresie. Szczególnie widoczne jest to w przypadku **PyTorch** oraz **Computer Vision**, gdzie zdecydowaną większość stanowią specjaliści z dużym doświadczeniem, a udział juniorów jest marginalny.
+  
+  W obszarze **DeFi** rozkład poziomów doświadczenia jest bardziej zrównoważony, jednak również tutaj udział freelancerów na poziomie senior pozostaje wysoki. Może to wynikać z charakteru tej dziedziny, która łączy zaawansowaną wiedzę techniczną z rozumieniem systemów finansowych i bezpieczeństwa.
+  
+  W przypadku **NLP** oraz **Data Science** zauważalny jest nieco większy udział poziomu mid w porównaniu do pozostałych umiejętności. Może to sugerować, że są to kompetencje bardziej dostępne dla specjalistów na średnim etapie kariery, jednak nadal wymagające znaczącego doświadczenia, aby osiągać najwyższe stawki.
+  
+  Połączenie obu wykresów prowadzi do jednoznacznego wniosku, że **wysoka wycena rynkowa umiejętności jest silnie powiązana z poziomem doświadczenia specjalistów, którzy je posiadają**. Najwyższe średnie stawki godzinowe nie wynikają wyłącznie z samej nazwy technologii, lecz z faktu, że są one wykorzystywane głównie przez doświadczonych freelancerów o wysokim poziomie kompetencji.
+
+  </details>
+  
+  Przeprowadzona analiza wykazała istotne zróżnicowanie wynagrodzeń freelancerów w zależności od posiadanych specjalizacji i kompetencji. Najwyższe stawki godzinowe osiągają umiejętności wymagające zaawansowanej wiedzy technicznej oraz wysokiej specjalizacji, w szczególności związane z obszarami sztucznej inteligencji, analizy danych oraz nowoczesnych technologii. Kompetencje te charakteryzują się jednocześnie relatywnie mniejszą liczbą wystąpień, co wskazuje na ich niszowy charakter i ograniczoną podaż specjalistów.
+
+  Dodatkowa analiza struktury poziomów doświadczenia wśród najwyżej wycenianych umiejętności pokazała, że dominują wnich freelancerzy na poziomie mid i senior. Udział juniorów jest niewielki, co sugeruje wysoką barierę wejścia oraz konieczność zdobycia doświadczenia przed osiągnięciem najwyższych stawek. Wyniki te potwierdzają, że na globalnym   rynku pracy freelancerów kluczowe znaczenie dla poziomu wynagrodzenia ma nie tylko zakres posiadanych kompetencji, lecz również stopień ich zaawansowania oraz doświadczenie zawodowe.
+  
+## Czynniki demograficzne i edukacyjne wpływające na stawki
+
+  W tej części analizy skoncentrowano się na zróżnicowaniu wynagrodzeń freelancerów w zależności od rodzaju specjalizacji oraz posiadanych kompetencji. Celem jest identyfikacja obszarów technologicznych i umiejętności,
+które osiągają najwyższe przeciętne stawki godzinowe na rynku pracy freelancerskiej.
+
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Zależność pomiędzy regionem geograficznym a poziomem wykształcenia została przedstawiona w formie mapy cieplnej, co pozwala jednocześnie porównać oba czynniki oraz ich łączny wpływ na średnią stawkę godzinową freelancerów.
+  
+  </p>
+
+```{r, echo=FALSE, warning=FALSE}
+heat_df <- data %>%
+  group_by(region, education) %>%
+  summarise(mean_rate = mean(hourly_rate_usd, na.rm = TRUE), .groups = "drop")
+library(ggplot2)
+ggplot(heat_df, aes(x = education, y = region, fill = mean_rate)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(
+    low = "#EFF3FF",
+    mid = "#6BAED6",
+    high = "#08306B",
+    midpoint = median(heat_df$mean_rate, na.rm = TRUE),
+    name = "Średnia stawka (USD)"
+  ) +
+  labs(
+    title = "Wpływ regionu i wykształcenia na średnią stawkę godzinową",
+    x = "Wykształcenie",
+    y = "Region"
+  ) +
+  theme_minimal(base_size = 12)
+
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+    
+  Wykres ilustruje zróżnicowanie średnich stawek godzinowych freelancerów w zależności od regionu geograficznego oraz poziomu wykształcenia. Z analizy wynika, że geograficzny ma wyraźnie większy wpływ na poziom średnich stawek godzinowych niż formalny poziom wykształcenia..
+  
+  Najwyższe średnie stawki godzinowe występują w **Europie Zachodniej** oraz **Ameryce Północnej**, szczególnie wśród freelancerów z wykształceniem **doktoranckim (PhD)** oraz po **bootcampach specjalistycznych**. Wskazuje to, że na najbardziej rozwiniętych rynkach pracy cenione są zarówno formalne, wysokie wykształcenie akademickie, jak i intensywne, praktyczne ścieżki edukacyjne.
+  
+  W regionach takich jak **Bliski Wschód** oraz **Azja i Pacyfik** obserwowane są umiarkowanie wysokie stawki, przy czym najwyższe wynagrodzenia również koncentrują się wśród osób z poziomem **PhD**. Jednocześnie różnice pomiędzy poziomami wykształcenia są tu mniejsze niż w Europie Zachodniej czy Ameryce Północnej, co może sugerować bardziej wyrównaną strukturę wynagrodzeń.
+  
+  Najniższe średnie stawki godzinowe występują w **Afryce**, **Ameryce Łacińskiej** oraz **Europie Wschodniej**, niezależnie od poziomu wykształcenia. W tych regionach wpływ formalnej edukacji na zarobki jest słabszy, a różnice pomiędzy poziomami wykształcenia są mniej wyraźne, co może wynikać z ograniczeń lokalnych rynków pracy oraz globalnych dysproporcji ekonomicznych.
+
+  </details>
+
+## Kontekst geograficzny i platformowy rynku freelancerów
+
+  Przedmiotami niniejszej analizy są kontekst geograficzny i platformowy rynku pracy freelancerskiej.Koncentruje się ona na zależnościach pomiędzy zasięgiem działalności platform a liczbą freelancerów, którzy z nich korzystają. Celem jest ocena, w jakim stopniu globalny zasięg platform przekłada się na ich skalę i znaczenie na rynku.
+
+  <div class="section-card">
+  </h3>
+  <p class="section-lead">
+  
+  Wykres ilustruje zależność pomiędzy zasięgiem geograficznym platform pracy a liczbą freelancerów korzystających z nich w badanej próbie, umożliwiając porównanie skali działalności poszczególnych platform. W celu lepszego zobrazowania danych z analizy wyeliminowano kategorię „Other”, która charakteryzowała się nieznaczącą liczbą obserwacji i zaburzała czytelność oraz ogólny ogląd wyników.
+  
+  </p>
+
+```{r, echo=FALSE, warning=FALSE}
+# Analiza
+
+countries_per_platform <- data %>%
+  filter(
+    !is.na(primary_platform),
+    !is.na(country),
+    primary_platform != "Other"
+  ) %>%
+  group_by(primary_platform) %>%
+  summarise(
+    n_countries = n_distinct(country),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_countries))
+
+platform_summary <- data %>%
+  filter(
+    !is.na(primary_platform),
+    !is.na(country),
+    primary_platform != "Other"
+  ) %>%
+  group_by(primary_platform) %>%
+  summarise(
+    n_countries = n_distinct(country),
+    n_freelancers = n(),
+    .groups = "drop"
+  )
+
+library(ggrepel)
+# Wykres
+library(ggplot2)
+ggplot(platform_summary, aes(x = n_countries, y = n_freelancers)) +
+  geom_point(size = 3, color = "#2171B5") +
+  scale_y_log10() +
+  geom_text_repel(
+    aes(label = primary_platform),
+    size = 3,
+    max.overlaps = 20
+  ) +
+  labs(
+    title = "Zasięg geograficzny platform a liczba freelancerów",
+    x = "Liczba krajów",
+    y = "Liczba freelancerów"
+  ) +
+  theme_minimal(base_size = 12)
+
+```
+  </div>
+
+  <details>
+  <summary><strong>Interpretacja wykresu</strong> (kliknij, aby zwinąć/rozwinąć)</summary>
+  
+  Analiza ukazuje zależność pomiędzy **liczbą krajów**, w których obecna jest dana platforma, a **liczbą freelancerów** korzystających z niej w badanej próbie. Widoczna jest wyraźna, dodatnia zależność – platformy o szerszym zasięgu geograficznym zazwyczaj skupiają większą liczbę użytkowników, jednak relacja ta nie jest proporcjonalna.
+  
+  Platformy takie jak **Upwork** oraz **Direct Client** charakteryzują się zarówno **bardzo dużym zasięgiem geograficznym**, jak i **najwyższą liczbą freelancerów**, co wskazuje na ich silną i ugruntowaną pozycję rynkową. W szczególności model **Direct Client**, mimo że nie jest klasyczną platformą pośredniczącą, okazuje się najskuteczniejszym kanałem współpracy, łącząc globalny zasięg z wysoką liczbą użytkowników.
+  
+  **Freelancer.com**, **LinkedIn** oraz **Toptal** tworzą grupę platform o podobnym zasięgu geograficznym, lecz zauważalnie mniejszej liczbie freelancerów niż liderzy rynku. Może to sugerować bardziej wyspecjalizowany charakter tych platform lub wyższe bariery wejścia.
+  
+  Z kolei **Fiverr**, mimo porównywalnego zasięgu geograficznego, skupia relatywnie mniejszą liczbę freelancerów w badanej próbie, co może wskazywać na specyficzny model usług lub inną strukturę użytkowników. Platforma **Other** wyraźnie odstaje od pozostałych – zarówno pod względem zasięgu, jak i liczby freelancerów – co sugeruje niszowy lub lokalny charakter tych rozwiązań.
+  
+  </details>
+  
+  Przeprowadzona analiza wskazuje, że platformy o szerszym zasięgu geograficznym zazwyczaj skupiają większą liczbę freelancerów, co potwierdza znaczenie globalnej dostępności w budowaniu skali działalności. Jednocześnie obserwowane różnice pomiędzy platformami sugerują, że na ich pozycję rynkową wpływa nie tylko zasięg terytorialny, lecz także model działania oraz stopień specjalizacji.
+  
+# Wnioski i refleksje
+
+## Wnioski
+
+**Jak różnią się zarobki freelancerów pomiędzy regionami świata?**
+
+Zarobki freelancerów istotnie różnią się pomiędzy regionami. Najwyższe przeciętne dochody roczne osiągane są w Europie Zachodniej oraz Ameryce Północnej, natomiast najniższe w Afryce, Ameryce Łacińskiej oraz Europie Wschodniej, co wskazuje na silny wpływ lokalnych uwarunkowań rynkowych.
+
+**Jak poziom doświadczenia wpływa na rozkład dochodów?**
+
+Wyższy poziom doświadczenia wiąże się nie tylko z wyższymi medianami dochodów, lecz także z większym rozrzutem wartości wynagrodzeń. Freelancerzy na poziomie senior osiągają najwyższe dochody, ale charakteryzują się również największą zmiennością wynagrodzeń.
+
+**Które umiejętności są najwyżej wyceniane?**
+
+Najwyżej wyceniane są umiejętności związane z zaawansowanymi technologiami, w szczególności z obszaru sztucznej inteligencji, analizy danych oraz blockchain, takimi jak PyTorch, Computer Vision, DeFi, NLP i Data Science.
+
+**Czy platforma pracy wiąże się z większym zasięgiem geograficznym i liczbą freelancerów?**
+Tak, platformy o szerszym zasięgu geograficznym zazwyczaj skupiają większą liczbę freelancerów. Jednocześnie skala platformy zależy nie tylko od zasięgu terytorialnego, lecz również od jej modelu działania i stopnia specjalizacji.
+
+**Czy doświadczenie wzmacnia różnice regionalne w dochodach rocznych?**
+
+Tak, różnice regionalne w dochodach rocznych są słabiej widoczne na poziomie junior, natomiast wyraźnie nasilają się na poziomach mid i senior, co wskazuje, że doświadczenie zawodowe wzmacnia wpływ regionu na poziom wynagrodzeń.
+
+## Ograniczenia
+
+Dane mają charakter deklaratywny i nie zawierają informacji o liczbie przepracowanych godzin.
+
+## Podsumowanie
+
+  Podsumowując, wynagrodzenie freelancerów jest wynikiem złożonej interakcji pomiędzy regionem, doświadczeniem, kompetencjami oraz kontekstem rynkowym. Uzyskane rezultaty potwierdzają, że najwyższy potencjał zarobkowy osiągają doświadczeni specjaliści posiadający wyspecjalizowane kompetencje, działający na rynkach o wysokim poziomie rozwoju gospodarczego.
